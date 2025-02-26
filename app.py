@@ -96,21 +96,34 @@ if st.button("📅 근무표 생성"):
 
     for date in df_schedule.columns:
         for _, row in df_nurse_info.iterrows():
-            nurse = row["이름"]
-            shift_type = row["근무 유형"]
-            if df_schedule.at[nurse, date] in ["Charge", "Acting"]:
-                continue
+    nurse = row["이름"]
 
-            if shift_type == "3교대 가능":
-                df_schedule.at[nurse, date] = random.choice(["D", "E", "N"])
-            elif shift_type == "D Keep":
-                df_schedule.at[nurse, date] = "D"
-            elif shift_type == "E Keep":
-                df_schedule.at[nurse, date] = "E"
-            elif shift_type == "N Keep":
-                df_schedule.at[nurse, date] = "N"
-            elif shift_type == "N 제외":
-                df_schedule.at[nurse, date] = random.choice(["D", "E"]) # N을 배제
+    # 원티드 오프 적용
+    if isinstance(row["Wanted Off"], str):
+        for day in row["Wanted Off"].split(", "):
+            if day in df_schedule.columns:
+                df_schedule.at[nurse, day] = "OFF"
+
+    # 휴가 적용
+    if isinstance(row["휴가"], str):
+        for day in row["휴가"].split(", "):
+            if day in df_schedule.columns:
+                df_schedule.at[nurse, day] = "OFF"
+
+    # 공가 적용
+    if isinstance(row["공가"], str):
+        for day in row["공가"].split(", "):
+            if day in df_schedule.columns:
+                df_schedule.at[nurse, day] = "OFF"
+
+# "N 후 D/E 배정 금지" 로직 적용
+for nurse in df_schedule.index:
+    for i in range(1, len(df_schedule.columns)):
+        prev_shift = df_schedule.at[nurse, df_schedule.columns[i-1]]
+        current_shift = df_schedule.at[nurse, df_schedule.columns[i]]
+
+        if prev_shift == "N" and current_shift in ["D", "E"]:
+            df_schedule.at[nurse, df_schedule.columns[i]] = "OFF"
             
     for _, row in df_nurse_info.iterrows():
         nurse = row["이름"]
