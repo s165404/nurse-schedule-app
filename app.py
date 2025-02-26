@@ -75,6 +75,16 @@ if st.sidebar.button("✅ 저장"):
                 nurse["휴가"] = vacation
                 nurse["공가"] = public_leave
 
+# "새 간호사 추가"가 아닐 때만, 즉 기존 간호사를 선택했을 때만 삭제 가능
+if selected_nurse != "새 간호사 추가":
+    if st.sidebar.button("❌ 간호사 삭제"):
+        # st.session_state.nurses 리스트에서 선택된 간호사 제거
+        st.session_state.nurses = [
+            n for n in st.session_state.nurses if n["이름"] != selected_nurse
+        ]
+        st.success(f"간호사 '{selected_nurse}' 정보를 삭제했습니다.")
+        st.stop()
+
     # 직원ID 기준으로 우선순위 자동 설정
     assign_priority(st.session_state.nurses)
 
