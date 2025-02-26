@@ -22,7 +22,7 @@ selected_nurse = st.sidebar.selectbox("수정할 간호사 선택", ["새 간호
 if selected_nurse == "새 간호사 추가":
     name = st.sidebar.text_input("이름", "")
     staff_id = st.sidebar.text_input("직원ID", "")
-    shift_type = st.sidebar.selectbox("근무 유형", ["3교대 가능", "D Keep", "E Keep", "N Keep"])
+    shift_type = st.sidebar.selectbox("근무 유형", ["3교대 가능", "D Keep", "E Keep", "N Keep", "N 제외"])
     charge = st.sidebar.checkbox("Charge Nurse 가능")
     acting = st.sidebar.checkbox("Acting Nurse 가능")
     wanted_off = st.sidebar.text_input("Wanted Off (쉼표로 구분)", "")
@@ -109,7 +109,9 @@ if st.button("📅 근무표 생성"):
                 df_schedule.at[nurse, date] = "E"
             elif shift_type == "N Keep":
                 df_schedule.at[nurse, date] = "N"
-
+            elif shift_type == "N 제외":
+                df_schedule.at[nurse, date] = random.choice(["D", "E"]) # N을 배제
+            
     for _, row in df_nurse_info.iterrows():
         nurse = row["이름"]
         if isinstance(row["Wanted Off"], str):
