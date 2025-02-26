@@ -86,7 +86,13 @@ if st.session_state.nurses:
 
 # 근무표 생성 버튼
 if st.button("📅 근무표 생성"):
-    # 우선순위대로 정렬 (이미 assign_priority 했으므로, 우선순위 순 정렬)
+    # 1) 간호사 목록이 비어 있는지 확인
+    if not st.session_state.nurses:
+        st.warning("간호사가 없습니다. 먼저 간호사를 추가해주세요.")
+        st.stop()  # 이 위치에서 코드 실행 중단
+
+    # 2) 간호사가 하나 이상 있으면 df_nurse_info 생성
+    df_nurse_info = pd.DataFrame(st.session_state.nurses)
     df_nurse_info = df_nurse_info.sort_values(by="우선순위")
 
     # 날짜 컬럼 생성 (1일 ~ 30일 예시)
