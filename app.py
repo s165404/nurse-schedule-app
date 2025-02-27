@@ -11,7 +11,11 @@ if "nurses" not in st.session_state:
     st.session_state.nurses = []
 
 def assign_priority(nurses):
-    nurses.sort(key=lambda x: int(x["직원ID"]))
+    for nurse in nurses:
+        if not nurse["직원ID"].isdigit():  # 직원ID가 숫자가 아니거나 빈 값이면 기본값 설정
+            nurse["직원ID"] = "9999"  # 임시로 가장 낮은 우선순위 부여
+
+    nurses.sort(key=lambda x: int(x["직원ID"]))  # 이제 변환 가능
     for i, nurse in enumerate(nurses):
         nurse["우선순위"] = i + 1
 
