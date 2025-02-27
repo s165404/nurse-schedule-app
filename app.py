@@ -72,6 +72,8 @@ if selected_nurse != "새 간호사 추가":
         st.success(f"간호사 '{selected_nurse}' 정보를 삭제했습니다.")
         st.stop()
 
+st.sidebar.button("🔄 세션 초기화", on_click=st.session_state.clear)
+
 if st.button("📅 근무표 생성"):
     if not st.session_state.nurses:
         st.warning("간호사가 없습니다. 먼저 간호사를 추가해주세요.")
