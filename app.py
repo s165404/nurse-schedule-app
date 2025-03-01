@@ -27,6 +27,24 @@ if "nurses" not in st.session_state:
 
 st.title("🏥 간호사 근무표 자동 생성기")
 
+# 📂 간호사 정보 불러오기 (엑셀 파일 업로드 기능 추가)
+st.sidebar.subheader("📂 간호사 정보 불러오기")
+uploaded_file = st.sidebar.file_uploader("엑셀 파일을 업로드하세요", type=["xlsx"])
+
+if uploaded_file:
+    df_uploaded = pd.read_excel(uploaded_file)
+
+    # 엑셀 파일에서 필요한 컬럼만 추출
+    required_columns = ["직원ID", "이름", "근무 유형", "Charge 가능", "Wanted Off", "휴가", "공가"]
+    
+    if all(col in df_uploaded.columns for col in required_columns):
+        st.session_state.nurses = df_uploaded.to_dict(orient="records")  # 엑셀 데이터를 세션에 저장
+        assign_priority(st.session_state.nurses)  # 우선순위 적용
+        save_data()  # 데이터 저장
+        st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
+    else:
+        st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
+
 st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
 
 # 🔄 우선순위 부여 함수
