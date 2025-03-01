@@ -93,7 +93,15 @@ if selected_nurse != "새 간호사 추가":
         st.success(f"간호사 '{selected_nurse}' 정보를 삭제했습니다.")
         st.stop()
 
-st.sidebar.button("🔄 세션 초기화", on_click=lambda: [st.session_state.clear(), load_data()])
+st.sidebar.button("🔄 세션 초기화", on_click=lambda: [save_data(), load_data()])
+
+# 📌 오른쪽 화면: 간호사 목록 표시 (자동 업데이트)
+st.write("### 🏥 현재 간호사 목록")
+if st.session_state.nurses:
+    df_nurse_info = pd.DataFrame(st.session_state.nurses).sort_values(by="우선순위")
+    st.data_editor(df_nurse_info, hide_index=True, use_container_width=True)
+else:
+    st.info("현재 추가된 간호사가 없습니다.")
 
 # 📅 근무표 생성 버튼
 if st.button("📅 근무표 생성"):
@@ -103,7 +111,6 @@ if st.button("📅 근무표 생성"):
 
     df_nurse_info = pd.DataFrame(st.session_state.nurses)
 
-    # 🛠 "우선순위" 컬럼이 없으면 자동 생성
     if "우선순위" not in df_nurse_info.columns:
         df_nurse_info["우선순위"] = range(1, len(df_nurse_info) + 1)
 
@@ -136,11 +143,3 @@ if st.button("📅 근무표 생성"):
 
     st.write("### 📅 생성된 근무표")
     st.data_editor(df_schedule, use_container_width=True)
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df_nurse_info.to_excel(writer, sheet_name="간호사 정보", index=False)
-        df_schedule.to_excel(writer, sheet_name="근무표", index=True)
-    output.seek(0)
-
-    st.download_button("📥 근무표 다운로드", data=output, file_name="nurse_schedule.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
