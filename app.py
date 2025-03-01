@@ -120,36 +120,41 @@ if st.button("📅 근무표 생성"):
     df_schedule = pd.DataFrame(index=df_nurse_info["이름"], columns=dates)
     df_schedule[:] = ""
 
+    # Charge Nurse (차지 가능자는 엑팅도 가능) / Acting Nurse (엑팅만 가능)
     charge_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "O"]["이름"].tolist()
+    acting_only_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "X"]["이름"].tolist()
+    night_only_charge = df_nurse_info[df_nurse_info["Night 차지 전용"] == "O"]["이름"].tolist()
 
     if len(charge_nurses) < 2:
         st.error("⚠️ Charge Nurse 인원이 부족합니다! 최소 2명 이상 필요합니다.")
         st.stop()
 
     for date in df_schedule.columns:
-        for i in range(2):  
-            nurse = random.choice(charge_nurses)
-            df_schedule.at[nurse, date] = f"{random.choice(['D', 'E', 'N'])} (C)"
-    
-    for date in df_schedule.columns:
-        for _, row in df_nurse_info.iterrows():
-            nurse = row["이름"]
-            if pd.isna(df_schedule.at[nurse, date]):
-                shift_type = row["근무 유형"]
-                if shift_type == "3교대 가능":
-                    df_schedule.at[nurse, date] = random.choice(["D", "E", "N"])
-                elif shift_type == "D Keep":
-                    df_schedule.at[nurse, date] = "D"
-                elif shift_type == "E Keep":
-                    df_schedule.at[nurse, date] = "E"
-                elif shift_type == "N Keep":
-                    df_schedule.at[nurse, date] = "N"
-                elif shift_type == "N 제외":
-                    df_schedule.at[nurse, date] = random.choice(["D", "E"])
+        # 🌙 나이트 근무 - 차지(Charge) 2명 필수 (엑팅 없음)
+        night_charge = []
+        if len(night_only_charge) >= 2:
+            night_charge = random.sample(night_only_charge, 2)
+        else:
+            night_charge = random.sample(charge_nurses, 2)
 
+        for nurse in night_charge:
+            df_schedule.at[nurse, date] = "N (C)"
+
+        # ☀️ 주간(D) & 저녁(E) 근무 - 차지 2명 + 엑팅 2명 배정
+        day_evening_charge = random.sample(charge_nurses, 2)
+        day_evening_acting = random.sample(acting_only_nurses, 2)
+
+        for nurse in day_evening_charge:
+            df_schedule.at[nurse, date] = random.choice(["D (C)", "E (C)"])
+
+        for nurse in day_evening_acting:
+            df_schedule.at[nurse, date] = random.choice(["D (A)", "E (A)"])
+
+    # 🚀 최종 근무표 출력
     st.write("### 📅 생성된 근무표")
     st.data_editor(df_schedule, use_container_width=True)
 
+    # 📥 엑셀 다운로드
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df_nurse_info.to_excel(writer, sheet_name="간호사 정보", index=False)
