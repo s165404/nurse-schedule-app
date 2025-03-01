@@ -39,8 +39,12 @@ if uploaded_file:
     
     if all(col in df_uploaded.columns for col in required_columns):
         st.session_state.nurses = df_uploaded.to_dict(orient="records")  # 엑셀 데이터를 세션에 저장
-        assign_priority(st.session_state.nurses)  # 우선순위 적용
-        save_data()  # 데이터 저장
+
+        # 🔹 데이터가 존재할 때만 우선순위 정렬 및 저장 수행
+        if st.session_state.nurses:  
+            assign_priority(st.session_state.nurses)
+            save_data()
+        
         st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
     else:
         st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
