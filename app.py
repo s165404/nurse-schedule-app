@@ -45,6 +45,29 @@ if uploaded_file:
     else:
         st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
 
+# 📥 엑셀 양식 다운로드 기능 추가
+sample_data = pd.DataFrame({
+    "직원ID": [101, 102, 103, 104],
+    "이름": ["홍길동", "이영희", "박철수", "김민지"],
+    "근무 유형": ["3교대 가능", "D Keep", "E Keep", "N Keep"],
+    "Charge 가능": ["O", "X", "O", "O"],
+    "Wanted Off": ["5, 10, 15", "3, 7, 21", "6, 11", "4, 19, 23"],
+    "휴가": ["8, 9", "14, 15", "-", "25"],
+    "공가": ["12", "-", "20", "-"]
+})
+
+output = io.BytesIO()
+with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    sample_data.to_excel(writer, index=False, sheet_name="간호사 정보 양식")
+output.seek(0)
+
+st.sidebar.download_button(
+    label="📥 엑셀 양식 다운로드",
+    data=output,
+    file_name="nurse_template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
 st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
 
 # 🔄 우선순위 부여 함수
