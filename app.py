@@ -29,6 +29,17 @@ st.title("🏥 간호사 근무표 자동 생성기")
 
 st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
 
+# 🔄 우선순위 부여 함수
+def assign_priority(nurses):
+    for nurse in nurses:
+        if not nurse["직원ID"].isdigit():  # 직원ID가 숫자가 아니면 기본값 "9999" 설정
+            nurse["직원ID"] = "9999"
+
+    nurses.sort(key=lambda x: int(x["직원ID"]))  # 직원ID 기준으로 정렬
+    
+    for i, nurse in enumerate(nurses):
+        nurse["우선순위"] = i + 1  # 정렬된 순서대로 "우선순위" 추가
+
 selected_nurse = st.sidebar.selectbox(
     "수정할 간호사 선택",
     ["새 간호사 추가"] + [n["이름"] for n in st.session_state.nurses]
@@ -72,7 +83,8 @@ if st.sidebar.button("✅ 저장"):
                     "휴가": vacation,
                     "공가": public_leave,
                 })
-    save_data()  # 데이터 저장
+    assign_priority(st.session_state.nurses)
+    save_data()
 
 if selected_nurse != "새 간호사 추가":
     if st.sidebar.button("❌ 간호사 삭제"):
@@ -89,10 +101,13 @@ if st.button("📅 근무표 생성"):
         st.warning("간호사가 없습니다. 먼저 간호사를 추가해주세요.")
         st.stop()
 
-    df_nurse_info = pd.DataFrame(st.session_state.nurses).sort_values(by="우선순위")
-    dates = [str(i) + "일" for i in range(1, 31)]
-    df_schedule = pd.DataFrame(index=df_nurse_info["이름"], columns=dates)
-    df_schedule[:] = ""
+    df_nurse_info = pd.DataFrame(st.session_state.nurses)
+
+    # 🛠 "우선순위" 컬럼이 없으면 자동 생성
+    if "우선순위" not in df_nurse_info.columns:
+        df_nurse_info["우선순위"] = range(1, len(df_nurse_info) + 1)
+
+    df_nurse_info = df_nurse_info.sort_values(by="우선순위")
 
     charge_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "O"]["이름"].tolist()
     acting_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "X"]["이름"].tolist()
@@ -100,6 +115,10 @@ if st.button("📅 근무표 생성"):
     if len(charge_nurses) < 2:
         st.error("⚠️ Charge Nurse 인원이 부족합니다! 최소 2명 이상 필요합니다.")
         st.stop()
+
+    dates = [str(i) + "일" for i in range(1, 31)]
+    df_schedule = pd.DataFrame(index=df_nurse_info["이름"], columns=dates)
+    df_schedule[:] = ""
 
     for date in df_schedule.columns:
         night_charge = random.sample(charge_nurses, 2)
