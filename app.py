@@ -2,45 +2,32 @@ import streamlit as st
 import pandas as pd
 import io
 import random
+import pickle  # 데이터 저장용 라이브러리
 
 st.set_page_config(page_title="🏥 간호사 근무표 자동 생성기", layout="wide")
 
-# 🌟 스타일 설정 (버튼, 테이블, 제목 스타일링)
-st.markdown("""
-    <style>
-    div.stButton > button:first-child {
-        background-color: #008CBA;
-        color: white;
-        width: 100%;
-        height: 50px;
-        font-size: 18px;
-        font-weight: bold;
-    }
-    div.stDownloadButton > button:first-child {
-        background-color: #4CAF50;
-        color: white;
-        width: 100%;
-        height: 40px;
-        font-size: 16px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+DATA_FILE = "nurse_data.pkl"  # 간호사 정보 저장 파일
+
+# 🔄 데이터 저장 함수 (세션 유지용)
+def save_data():
+    with open(DATA_FILE, "wb") as f:
+        pickle.dump(st.session_state.nurses, f)
+
+# 🔄 데이터 불러오기 함수
+def load_data():
+    try:
+        with open(DATA_FILE, "rb") as f:
+            st.session_state.nurses = pickle.load(f)
+    except FileNotFoundError:
+        st.session_state.nurses = []
+
+# 📌 앱 시작 시 기존 데이터 불러오기
+if "nurses" not in st.session_state:
+    load_data()
 
 st.title("🏥 간호사 근무표 자동 생성기")
 
-# 🏥 사이드바: 간호사 추가 및 수정
 st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
-
-if "nurses" not in st.session_state:
-    st.session_state.nurses = []
-
-def assign_priority(nurses):
-    for nurse in nurses:
-        if not nurse["직원ID"].isdigit():
-            nurse["직원ID"] = "9999"
-    nurses.sort(key=lambda x: int(x["직원ID"]))
-    for i, nurse in enumerate(nurses):
-        nurse["우선순위"] = i + 1
 
 selected_nurse = st.sidebar.selectbox(
     "수정할 간호사 선택",
@@ -85,29 +72,16 @@ if st.sidebar.button("✅ 저장"):
                     "휴가": vacation,
                     "공가": public_leave,
                 })
-    assign_priority(st.session_state.nurses)
+    save_data()  # 데이터 저장
 
 if selected_nurse != "새 간호사 추가":
     if st.sidebar.button("❌ 간호사 삭제"):
         st.session_state.nurses = [n for n in st.session_state.nurses if n["이름"] != selected_nurse]
+        save_data()
         st.success(f"간호사 '{selected_nurse}' 정보를 삭제했습니다.")
         st.stop()
 
-# 🔄 세션 초기화 버튼
-st.sidebar.button("🔄 세션 초기화", on_click=lambda: st.session_state.clear())
-
-# 🏥 현재 간호사 목록 표시 (엑셀 스타일)
-st.write("### 🏥 현재 간호사 목록")
-
-if st.session_state.nurses:
-    df_nurse_info = pd.DataFrame(st.session_state.nurses).sort_values(by="우선순위")
-    st.data_editor(
-        df_nurse_info,
-        hide_index=True,
-        use_container_width=True,
-    )
-else:
-    st.info("현재 추가된 간호사가 없습니다.")
+st.sidebar.button("🔄 세션 초기화", on_click=lambda: [st.session_state.clear(), load_data()])
 
 # 📅 근무표 생성 버튼
 if st.button("📅 근무표 생성"):
@@ -120,29 +94,20 @@ if st.button("📅 근무표 생성"):
     df_schedule = pd.DataFrame(index=df_nurse_info["이름"], columns=dates)
     df_schedule[:] = ""
 
-    # Charge Nurse (차지 가능자는 엑팅도 가능) / Acting Nurse (엑팅만 가능)
     charge_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "O"]["이름"].tolist()
-    acting_only_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "X"]["이름"].tolist()
-    night_only_charge = df_nurse_info[df_nurse_info["Night 차지 전용"] == "O"]["이름"].tolist()
+    acting_nurses = df_nurse_info[df_nurse_info["Charge 가능"] == "X"]["이름"].tolist()
 
     if len(charge_nurses) < 2:
         st.error("⚠️ Charge Nurse 인원이 부족합니다! 최소 2명 이상 필요합니다.")
         st.stop()
 
     for date in df_schedule.columns:
-        # 🌙 나이트 근무 - 차지(Charge) 2명 필수 (엑팅 없음)
-        night_charge = []
-        if len(night_only_charge) >= 2:
-            night_charge = random.sample(night_only_charge, 2)
-        else:
-            night_charge = random.sample(charge_nurses, 2)
-
+        night_charge = random.sample(charge_nurses, 2)
         for nurse in night_charge:
             df_schedule.at[nurse, date] = "N (C)"
 
-        # ☀️ 주간(D) & 저녁(E) 근무 - 차지 2명 + 엑팅 2명 배정
         day_evening_charge = random.sample(charge_nurses, 2)
-        day_evening_acting = random.sample(acting_only_nurses, 2)
+        day_evening_acting = random.sample(acting_nurses, 2)
 
         for nurse in day_evening_charge:
             df_schedule.at[nurse, date] = random.choice(["D (C)", "E (C)"])
@@ -150,11 +115,9 @@ if st.button("📅 근무표 생성"):
         for nurse in day_evening_acting:
             df_schedule.at[nurse, date] = random.choice(["D (A)", "E (A)"])
 
-    # 🚀 최종 근무표 출력
     st.write("### 📅 생성된 근무표")
     st.data_editor(df_schedule, use_container_width=True)
 
-    # 📥 엑셀 다운로드
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df_nurse_info.to_excel(writer, sheet_name="간호사 정보", index=False)
