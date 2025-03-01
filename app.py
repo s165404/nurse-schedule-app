@@ -44,8 +44,7 @@ if uploaded_file:
         if st.session_state.nurses:  
             assign_priority(st.session_state.nurses)
             save_data()
-        
-        st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
+           st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
     else:
         st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
 
