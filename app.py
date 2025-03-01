@@ -4,6 +4,17 @@ import io
 import random
 import pickle  # 데이터 저장용 라이브러리
 
+# 🔄 우선순위 부여 함수
+def assign_priority(nurses):
+    for nurse in nurses:
+        if not nurse["직원ID"].isdigit():  # 직원ID가 숫자가 아니면 기본값 "9999" 설정
+            nurse["직원ID"] = "9999"
+
+    nurses.sort(key=lambda x: int(x["직원ID"]))  # 직원ID 기준으로 정렬
+    
+    for i, nurse in enumerate(nurses):
+        nurse["우선순위"] = i + 1  # 정렬된 순서대로 "우선순위" 추가
+
 st.set_page_config(page_title="🏥 간호사 근무표 자동 생성기", layout="wide")
 
 DATA_FILE = "nurse_data.pkl"  # 간호사 정보 저장 파일
@@ -77,17 +88,6 @@ st.sidebar.download_button(
 )
 
 st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
-
-# 🔄 우선순위 부여 함수
-def assign_priority(nurses):
-    for nurse in nurses:
-        if not nurse["직원ID"].isdigit():  # 직원ID가 숫자가 아니면 기본값 "9999" 설정
-            nurse["직원ID"] = "9999"
-
-    nurses.sort(key=lambda x: int(x["직원ID"]))  # 직원ID 기준으로 정렬
-    
-    for i, nurse in enumerate(nurses):
-        nurse["우선순위"] = i + 1  # 정렬된 순서대로 "우선순위" 추가
 
 selected_nurse = st.sidebar.selectbox(
     "수정할 간호사 선택",
