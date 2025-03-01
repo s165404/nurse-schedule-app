@@ -40,6 +40,9 @@ if uploaded_file:
     if all(col in df_uploaded.columns for col in required_columns):
         st.session_state.nurses = df_uploaded.to_dict(orient="records")  # 엑셀 데이터를 세션에 저장
 
+        # 🔹 현재 세션에 저장된 간호사 목록을 확인하는 디버깅 코드 추가 
+        st.write("📋 현재 저장된 간호사 목록:", st.session_state.nurses)
+
         # 🔹 데이터가 존재할 때만 우선순위 정렬 및 저장 수행
         if st.session_state.nurses:  
             assign_priority(st.session_state.nurses)
