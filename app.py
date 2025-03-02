@@ -3,11 +3,11 @@ import pandas as pd
 import io
 import calendar
 import requests
-from datetime import datetime
+from dotenv import load_dotenv
 
-# 📌 공휴일 API 호출 함수
-def get_korean_holidays(year, month):
-    API_KEY = ""  # 🔹 공공데이터포털에서 발급받은 API 키 입력
+# 📌 .env파일에서 API키 불러오기
+load_dotenv()
+API_KEY = os.getenv("HOLIDAY_API_KEY")
     url = f"https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?solYear={year}&solMonth={str(month).zfill(2)}&ServiceKey={API_KEY}&_type=json"
 
     response = requests.get(url)
