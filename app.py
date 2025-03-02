@@ -41,54 +41,60 @@ if uploaded_file:
     else:
         st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
 
-# 🔹 **근무표 생성 함수 (규칙 반영)**
-def generate_schedule(nurses):
+# 🔹 **한 달치 근무표 생성 함수**
+def generate_monthly_schedule(nurses, days=30):
     schedule = []
     shift_order = ["D", "E", "N", "OFF"]
-    charge_nurses = [n for n in nurses if n["Charge 가능"] == "O"]
+    
+    for day in range(1, days + 1):
+        daily_schedule = []
+        charge_nurses = [n for n in nurses if n["Charge 가능"] == "O"]
 
-    for i, nurse in enumerate(nurses):
-        if nurse["근무 유형"] == "D Keep":
-            assigned_shift = "D"
-        elif nurse["근무 유형"] == "E Keep":
-            assigned_shift = "E"
-        elif nurse["근무 유형"] == "N Keep":
-            assigned_shift = "N"
-        else:
-            assigned_shift = shift_order[i % len(shift_order)]  # 기본 순환
+        for i, nurse in enumerate(nurses):
+            if nurse["근무 유형"] == "D Keep":
+                assigned_shift = "D"
+            elif nurse["근무 유형"] == "E Keep":
+                assigned_shift = "E"
+            elif nurse["근무 유형"] == "N Keep":
+                assigned_shift = "N"
+            else:
+                assigned_shift = shift_order[(i + day) % len(shift_order)]  # 한 달 순환
 
-        # 📌 Wanted Off 적용
-        if "Wanted Off" in nurse and nurse["Wanted Off"]:
-            assigned_shift = "OFF"
+            # 📌 Wanted Off 적용
+            if "Wanted Off" in nurse and str(day) in nurse["Wanted Off"].split(", "):
+                assigned_shift = "OFF"
 
-        # 📌 Charge Nurse 배치 (2명 유지)
-        is_charge = False
-        if assigned_shift == "N":
-            # 🔹 나이트 근무 시 "3교대 가능"인 사람은 자동으로 차지 가능
-            if nurse["근무 유형"] == "3교대 가능":
-                is_charge = True
-        else:
-            # 🔹 일반 근무 시에는 "Charge 가능"이 O인 사람만 차지 가능
-            if len([n for n in schedule if n["근무 일정"] == assigned_shift and "Charge" in n]) < 2:
-                if nurse in charge_nurses:
+            # 📌 Charge Nurse 배치 (2명 유지)
+            is_charge = False
+            if assigned_shift == "N":
+                # 🔹 나이트 근무 시 "3교대 가능"인 사람은 자동으로 차지 가능
+                if nurse["근무 유형"] == "3교대 가능":
                     is_charge = True
+            else:
+                # 🔹 일반 근무 시에는 "Charge 가능"이 O인 사람만 차지 가능
+                if len([n for n in daily_schedule if n["근무 일정"] == assigned_shift and "(C)" in n["근무 일정"]]) < 2:
+                    if nurse in charge_nurses:
+                        is_charge = True
 
-        # 🔹 근무 일정 추가
-        schedule.append({
-            "이름": nurse["이름"],
-            "근무 유형": nurse["근무 유형"],
-            "근무 일정": f"{assigned_shift} {'(C)' if is_charge else ''}"
-        })
+            # 🔹 근무 일정 추가
+            daily_schedule.append({
+                "이름": nurse["이름"],
+                "근무 유형": nurse["근무 유형"],
+                "날짜": f"{day}일",
+                "근무 일정": f"{assigned_shift} {'(C)' if is_charge else ''}"
+            })
+
+        schedule.extend(daily_schedule)  # 한 달 동안 누적
 
     return pd.DataFrame(schedule)
 
 # 📅 근무표 생성 버튼 추가
-st.header("📅 간호사 근무표 자동 생성기")
-if st.button("📌 근무표 생성"):
+st.header("📅 간호사 한 달치 근무표 자동 생성기")
+if st.button("📌 한 달 근무표 생성"):
     if "nurses" in st.session_state and st.session_state.nurses:
-        schedule_df = generate_schedule(st.session_state.nurses)
+        schedule_df = generate_monthly_schedule(st.session_state.nurses)
 
-        st.write("📌 **생성된 근무표**")
+        st.write("📌 **한 달간 생성된 근무표**")
         st.dataframe(schedule_df)  
 
         # 📥 생성된 근무표 다운로드 기능 추가
@@ -98,9 +104,9 @@ if st.button("📌 근무표 생성"):
         output_schedule.seek(0)
 
         st.download_button(
-            label="📥 근무표 다운로드",
+            label="📥 한 달 근무표 다운로드",
             data=output_schedule,
-            file_name="nurse_schedule.xlsx",
+            file_name="monthly_nurse_schedule.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     else:
