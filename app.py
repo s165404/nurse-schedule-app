@@ -5,18 +5,17 @@ import io
 # 🔄 우선순위 부여 함수 (직원ID 기준 정렬)
 def assign_priority(nurses):
     for nurse in nurses:
-        # 직원ID가 None이거나 NaN이면 기본값 설정
         if "직원ID" not in nurse or nurse["직원ID"] is None or pd.isna(nurse["직원ID"]):
             nurse["직원ID"] = "9999"
         elif isinstance(nurse["직원ID"], str) and not nurse["직원ID"].isdigit():
             nurse["직원ID"] = "9999"
         else:
-            nurse["직원ID"] = str(nurse["직원ID"])  # 숫자로 변환 가능하면 문자열로 유지
+            nurse["직원ID"] = str(nurse["직원ID"])  
 
-    nurses.sort(key=lambda x: int(x["직원ID"]))  # 직원ID 기준으로 정렬
+    nurses.sort(key=lambda x: int(x["직원ID"]))  
 
     for i, nurse in enumerate(nurses):
-        nurse["우선순위"] = i + 1  # 정렬된 순서대로 "우선순위" 추가
+        nurse["우선순위"] = i + 1  
 
 # 📂 간호사 정보 불러오기 (엑셀 파일 업로드 기능 추가)
 st.sidebar.subheader("📂 간호사 정보 불러오기")
@@ -25,45 +24,84 @@ uploaded_file = st.sidebar.file_uploader("엑셀 파일을 업로드하세요", 
 if uploaded_file:
     df_uploaded = pd.read_excel(uploaded_file)
 
-    # 🔹 NaN 값을 빈 문자열("")로 변환하여 오류 방지
-    df_uploaded = df_uploaded.fillna("").astype(str)  # 모든 값을 문자열로 변환하여 NaN 제거
+    df_uploaded = df_uploaded.fillna("").astype(str)  
 
     required_columns = ["직원ID", "이름", "근무 유형", "Charge 가능", "Wanted Off", "휴가", "공가"]
     
     if all(col in df_uploaded.columns for col in required_columns):
-        st.session_state.nurses = df_uploaded.to_dict(orient="records")  # NaN이 제거된 데이터를 세션에 저장
+        st.session_state.nurses = df_uploaded.to_dict(orient="records")  
 
-        # 🔹 현재 세션에 저장된 간호사 목록을 확인하는 디버깅 코드 추가
         st.write("📋 현재 저장된 간호사 목록:", st.session_state.nurses)
 
-        # 🔹 데이터가 존재할 때만 실행 (빈 데이터일 경우 실행 안 함)
         if st.session_state.nurses:
-            assign_priority(st.session_state.nurses)  # ✅ NaN이 제거된 데이터 사용
+            assign_priority(st.session_state.nurses)  
             st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
         else:
             st.warning("📢 업로드된 간호사 데이터가 없습니다. 엑셀 파일을 확인하세요.")
     else:
         st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
 
-# 📥 엑셀 양식 다운로드 기능 추가
-sample_data = pd.DataFrame({
-    "직원ID": [101, 102, 103, 104],
-    "이름": ["홍길동", "이영희", "박철수", "김민지"],
-    "근무 유형": ["3교대 가능", "D Keep", "E Keep", "N Keep"],
-    "Charge 가능": ["O", "X", "O", "O"],
-    "Wanted Off": ["5, 10, 15", "3, 7, 21", "6, 11", "4, 19, 23"],
-    "휴가": ["8, 9", "14, 15", "-", "25"],
-    "공가": ["12", "-", "20", "-"]
-})
+# 🔹 **근무표 생성 함수 (규칙 반영)**
+def generate_schedule(nurses):
+    schedule = []
+    shift_order = ["D", "E", "N", "OFF"]
+    charge_nurses = [n for n in nurses if n["Charge 가능"] == "O"]
 
-output = io.BytesIO()
-with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-    sample_data.to_excel(writer, index=False, sheet_name="간호사 정보 양식")
-output.seek(0)
+    for i, nurse in enumerate(nurses):
+        if nurse["근무 유형"] == "D Keep":
+            assigned_shift = "D"
+        elif nurse["근무 유형"] == "E Keep":
+            assigned_shift = "E"
+        elif nurse["근무 유형"] == "N Keep":
+            assigned_shift = "N"
+        else:
+            assigned_shift = shift_order[i % len(shift_order)]  # 기본 순환
 
-st.sidebar.download_button(
-    label="📥 엑셀 양식 다운로드",
-    data=output,
-    file_name="nurse_template.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+        # 📌 Wanted Off 적용
+        if "Wanted Off" in nurse and nurse["Wanted Off"]:
+            assigned_shift = "OFF"
+
+        # 📌 Charge Nurse 배치 (2명 유지)
+        is_charge = False
+        if assigned_shift == "N":
+            # 🔹 나이트 근무 시 "3교대 가능"인 사람은 자동으로 차지 가능
+            if nurse["근무 유형"] == "3교대 가능":
+                is_charge = True
+        else:
+            # 🔹 일반 근무 시에는 "Charge 가능"이 O인 사람만 차지 가능
+            if len([n for n in schedule if n["근무 일정"] == assigned_shift and "Charge" in n]) < 2:
+                if nurse in charge_nurses:
+                    is_charge = True
+
+        # 🔹 근무 일정 추가
+        schedule.append({
+            "이름": nurse["이름"],
+            "근무 유형": nurse["근무 유형"],
+            "근무 일정": f"{assigned_shift} {'(C)' if is_charge else ''}"
+        })
+
+    return pd.DataFrame(schedule)
+
+# 📅 근무표 생성 버튼 추가
+st.header("📅 간호사 근무표 자동 생성기")
+if st.button("📌 근무표 생성"):
+    if "nurses" in st.session_state and st.session_state.nurses:
+        schedule_df = generate_schedule(st.session_state.nurses)
+
+        st.write("📌 **생성된 근무표**")
+        st.dataframe(schedule_df)  
+
+        # 📥 생성된 근무표 다운로드 기능 추가
+        output_schedule = io.BytesIO()
+        with pd.ExcelWriter(output_schedule, engine="xlsxwriter") as writer:
+            schedule_df.to_excel(writer, index=False, sheet_name="근무표")
+        output_schedule.seek(0)
+
+        st.download_button(
+            label="📥 근무표 다운로드",
+            data=output_schedule,
+            file_name="nurse_schedule.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.error("❌ 간호사 정보를 먼저 업로드하세요!")
