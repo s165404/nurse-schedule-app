@@ -26,20 +26,22 @@ if uploaded_file:
     df_uploaded = pd.read_excel(uploaded_file)
 
     # 🔹 NaN 값을 빈 문자열("")로 변환하여 오류 방지
-    df_uploaded = df_uploaded.fillna("")
+    df_uploaded = df_uploaded.fillna("").astype(str)  # 모든 값을 문자열로 변환하여 NaN 제거
 
-    # 🔹 데이터를 다시 `st.session_state.nurses`에 저장하면서 `NaN` 제거
-    st.session_state.nurses = df_uploaded.astype(str).to_dict(orient="records")
+    required_columns = ["직원ID", "이름", "근무 유형", "Charge 가능", "Wanted Off", "휴가", "공가"]
+    
+    if all(col in df_uploaded.columns for col in required_columns):
+        st.session_state.nurses = df_uploaded.to_dict(orient="records")  # NaN이 제거된 데이터를 세션에 저장
 
-    # 🔹 현재 세션에 저장된 간호사 목록을 확인하는 디버깅 코드 추가
-    st.write("📋 현재 저장된 간호사 목록:", st.session_state.nurses)
+        # 🔹 현재 세션에 저장된 간호사 목록을 확인하는 디버깅 코드 추가
+        st.write("📋 현재 저장된 간호사 목록:", st.session_state.nurses)
 
-    # 🔹 데이터가 존재할 때만 실행 (빈 데이터일 경우 실행 안 함)
-    if st.session_state.nurses:
-        assign_priority(st.session_state.nurses)  # ✅ NaN이 제거된 데이터 사용
-        st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
-    else:
-        st.warning("📢 업로드된 간호사 데이터가 없습니다. 엑셀 파일을 확인하세요.")
+        # 🔹 데이터가 존재할 때만 실행 (빈 데이터일 경우 실행 안 함)
+        if st.session_state.nurses:
+            assign_priority(st.session_state.nurses)  # ✅ NaN이 제거된 데이터 사용
+            st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
+        else:
+            st.warning("📢 업로드된 간호사 데이터가 없습니다. 엑셀 파일을 확인하세요.")
     else:
         st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다. 올바른 컬럼을 포함하고 있는지 확인하세요.")
 
