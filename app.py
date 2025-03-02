@@ -51,29 +51,25 @@ selected_month = st.sidebar.number_input("월 선택", min_value=1, max_value=12
 # 해당 월의 일수 가져오기
 days_in_month = calendar.monthrange(selected_year, selected_month)[1]
 
-# 📌 **공휴일 입력 (추후 API 연동 가능)**
-holiday_dates = st.sidebar.text_area("해당 월의 공휴일 (쉼표로 구분, 예: 1, 15, 25)", "")
-
-if holiday_dates:
-    holiday_list = [int(day.strip()) for day in holiday_dates.split(",") if day.strip().isdigit()]
-else:
-    holiday_list = []
-
 # 🔹 **월별 근무표 생성 함수**
 def generate_monthly_schedule(nurses, days=30):
-    nurses_sorted = sorted(nurses, key=lambda x: int(x["직원ID"]))  # 연차순 정렬
-    schedule_dict = {n["이름"]: [""] * days for n in nurses_sorted}  # 초기 빈 근무표
+    # N Keep 간호사를 아래로 정렬
+    n_keep_nurses = [n for n in nurses if n["근무 유형"] == "N Keep"]
+    other_nurses = [n for n in nurses if n["근무 유형"] != "N Keep"]
+    nurses_sorted = sorted(other_nurses, key=lambda x: int(x["직원ID"])) + sorted(n_keep_nurses, key=lambda x: int(x["직원ID"]))
 
+    schedule_dict = {f"{n['이름']} ({n['근무 유형']})": [""] * days for n in nurses_sorted}  # 초기 빈 근무표
     shift_order = ["D", "E", "N", "OFF"]
-    
+    night_count = {n["이름"]: 0 for n in nurses_sorted}  # 나이트 연속 근무 확인용
+
     for day in range(days):
-        weekday = calendar.weekday(selected_year, selected_month, day + 1)  # 0: 월, 6: 일
         charge_nurses = [n for n in nurses_sorted if n["Charge 가능"] == "O"]
-        
+
         for i, nurse in enumerate(nurses_sorted):
-            # 📌 공휴일, 토요일, 일요일이면 자동 OFF 부여
-            if (day + 1) in holiday_list or weekday in [5, 6]:  # 토요일(5), 일요일(6)
+            # 📌 나이트 3연속 제한 (이전 3일간 나이트였으면 강제 OFF)
+            if night_count[nurse["이름"]] >= 3:
                 assigned_shift = "OFF"
+                night_count[nurse["이름"]] = 0  # 연속 카운트 초기화
             else:
                 if nurse["근무 유형"] == "D Keep":
                     assigned_shift = "D"
@@ -81,6 +77,7 @@ def generate_monthly_schedule(nurses, days=30):
                     assigned_shift = "E"
                 elif nurse["근무 유형"] == "N Keep":
                     assigned_shift = "N"
+                    night_count[nurse["이름"]] += 1  # 나이트 근무 카운트 증가
                 else:
                     assigned_shift = shift_order[(i + day) % len(shift_order)]  # 한 달 순환
 
@@ -100,12 +97,14 @@ def generate_monthly_schedule(nurses, days=30):
                     if nurse in charge_nurses:
                         is_charge = True
 
-            # 🔹 근무 일정 추가 (가독성 개선)
-            schedule_dict[nurse["이름"]][day] = f"{assigned_shift} {'(C)' if is_charge else ''}"
+            # 🔹 OFF에는 차지 표시 ❌
+            schedule_dict[f"{nurse['이름']} ({nurse['근무 유형']})"][day] = f"{assigned_shift} {'(C)' if is_charge and assigned_shift != 'OFF' else ''}"
 
     # 📌 pandas DataFrame으로 변환하여 가로로 날짜, 세로로 직원 배치
-    schedule_df = pd.DataFrame(schedule_dict)
-    schedule_df.insert(0, "날짜", [f"{selected_month}월 {d+1}일" for d in range(days)])
+    schedule_df = pd.DataFrame(schedule_dict).T
+    schedule_df.columns = [f"{selected_month}월 {d+1}일" for d in range(days)]
+    schedule_df.insert(0, "이름", schedule_df.index)  # 직원명 컬럼 추가
+    schedule_df.reset_index(drop=True, inplace=True)  # 인덱스 초기화
 
     return schedule_df
 
