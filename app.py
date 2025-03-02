@@ -7,7 +7,7 @@ from datetime import datetime
 
 # 📌 공휴일 API 호출 함수
 def get_korean_holidays(year, month):
-    API_KEY = "uUphF3Bca10axnyQuJxIvmJvJmK%2FhEm%2BHscgxCBiUFTL0GIYDsAtRT7aBgDxX7N66Ps76L4Y3ZgwQjbRXzmsEQ%3D%3D"  # 🔹 공공데이터포털에서 발급받은 API 키 입력
+    API_KEY = ""  # 🔹 공공데이터포털에서 발급받은 API 키 입력
     url = f"https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?solYear={year}&solMonth={str(month).zfill(2)}&ServiceKey={API_KEY}&_type=json"
 
     response = requests.get(url)
