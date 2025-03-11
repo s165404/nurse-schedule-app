@@ -50,13 +50,26 @@ if st.button("📊 근무표 생성"):
 
     # 📌 **오프 반영 (Wanted Off → 휴가 → 공가 순)**
     for nurse in nurses_df.itertuples():
-        off_days = str(getattr(nurse, "Wanted_Off", "")).split(",") + str(getattr(nurse, "휴가", "")).split(",") + str(getattr(nurse, "공가", "")).split(",")
+        off_days = str(getattr(nurse, "Wanted Off", "")).split(",") + \
+                   str(getattr(nurse, "휴가", "")).split(",") + \
+                   str(getattr(nurse, "공가", "")).split(",")
         for day in off_days:
             try:
                 day = int(day.strip()) - 1
                 schedule_df.at[nurse.이름, f"{day+1}일"] = "🔴 OFF"
             except:
                 continue
+
+    # 📌 **최소 오프 개수 자동 보장 (토요일+일요일+공휴일 개수)**
+    required_off = 8  # 예제: 한 달 최소 8개 OFF 필요
+    for nurse in nurses_df.itertuples():
+        off_count = sum([1 for day in range(num_days) if schedule_df.at[nurse.이름, f"{day+1}일"] == "🔴 OFF"])
+        if off_count < required_off:
+            missing_offs = required_off - off_count
+            for _ in range(missing_offs):
+                empty_days = [day for day in range(num_days) if pd.isna(schedule_df.at[nurse.이름, f"{day+1}일"])]
+                if empty_days:
+                    schedule_df.at[nurse.이름, f"{random.choice(empty_days)+1}일"] = "🔴 OFF"
 
     # 📌 **Acting Nurse 배치 (A/B 팀 구분)**
     team_tracking = {}
@@ -92,7 +105,6 @@ if st.button("📊 근무표 생성"):
                 consecutive_days = 0
 
     # 📌 **미오프 수당 표시 (필수 오프 못 채운 경우)**
-    required_off = 8  # 예제: 한 달 최소 8개 OFF 필요
     for nurse in nurses_df.itertuples():
         off_count = sum([1 for day in range(num_days) if schedule_df.at[nurse.이름, f"{day+1}일"] == "🔴 OFF"])
         if off_count < required_off:
