@@ -50,7 +50,7 @@ if st.button("📊 근무표 생성"):
 
     # 📌 **오프 반영 (Wanted Off → 휴가 → 공가 순)**
     for nurse in nurses_df.itertuples():
-        off_days = str(nurse.Wanted_Off).split(",") + str(nurse.휴가).split(",") + str(nurse.공가).split(",")
+        off_days = str(getattr(nurse, "Wanted_Off", "")).split(",") + str(getattr(nurse, "휴가", "")).split(",") + str(getattr(nurse, "공가", "")).split(",")
         for day in off_days:
             try:
                 day = int(day.strip()) - 1
