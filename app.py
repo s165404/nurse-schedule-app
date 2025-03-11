@@ -1,132 +1,69 @@
 import streamlit as st
 import pandas as pd
-import io
-import calendar
-import requests
-from dotenv import load_dotenv
+import random
 
-# 📌 .env파일에서 API키 불러오기
-load_dotenv()
-API_KEY = os.getenv("HOLIDAY_API_KEY")
-    url = f"https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?solYear={year}&solMonth={str(month).zfill(2)}&ServiceKey={API_KEY}&_type=json"
+# 간호사 데이터 저장 (세션 유지)
+if "nurses" not in st.session_state:
+    st.session_state.nurses = []
 
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        data = response.json()
-        try:
-            holidays = [int(item['locdate']) % 100 for item in data['response']['body']['items']['item']]
-            return holidays
-        except KeyError:
-            return []
-    else:
-        return []
+# 📌 간호사 추가 및 수정 섹션
+st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
+selected_nurse = st.sidebar.selectbox("수정할 간호사 선택", ["새 간호사 추가"] + [n["이름"] for n in st.session_state.nurses])
 
-# 📌 우선순위 부여 함수
-def assign_priority(nurses):
-    for nurse in nurses:
-        if "직원ID" not in nurse or nurse["직원ID"] is None or pd.isna(nurse["직원ID"]):
-            nurse["직원ID"] = "9999"
-        elif isinstance(nurse["직원ID"], str) and not nurse["직원ID"].isdigit():
-            nurse["직원ID"] = "9999"
-        else:
-            nurse["직원ID"] = str(nurse["직원ID"])  
+if selected_nurse == "새 간호사 추가":
+    name = st.sidebar.text_input("이름")
+    nurse_id = st.sidebar.text_input("직원 ID (숫자 입력)")
+    work_type = st.sidebar.selectbox("근무 유형 선택", ["D Keep", "E Keep", "N Keep", "3교대 가능", "N 제외"])
+    can_charge = st.sidebar.checkbox("⚡ Charge Nurse 가능")
+    can_acting = st.sidebar.checkbox("🩺 Acting Nurse 가능")
+    night_charge_only = st.sidebar.checkbox("🌙 N 근무 시 Charge Nurse 가능")  # 📌 추가된 필드
+    wanted_off = st.sidebar.text_area("Wanted Off (쉼표로 구분)")
+    leave = st.sidebar.text_area("휴가 (쉼표로 구분)")
+    public_holiday = st.sidebar.text_area("공가 (쉼표로 구분)")
 
-    nurses.sort(key=lambda x: int(x["직원ID"]))  
+    if st.sidebar.button("저장"):
+        st.session_state.nurses.append({
+            "이름": name, "직원ID": nurse_id, "근무 유형": work_type,
+            "Charge 가능": "O" if can_charge else "",
+            "Acting 가능": "O" if can_acting else "",
+            "N 차지 전용": "O" if night_charge_only else "",  # 📌 추가된 필드
+            "Wanted Off": wanted_off, "휴가": leave, "공가": public_holiday
+        })
+        st.sidebar.success(f"✅ {name} 간호사 정보가 저장되었습니다!")
 
-    for i, nurse in enumerate(nurses):
-        nurse["우선순위"] = i + 1  
+# 📌 간호사 목록 확인용 (디버깅)
+st.write("📋 현재 저장된 간호사 목록:", st.session_state.nurses)
 
-# 📂 간호사 정보 불러오기
-st.sidebar.subheader("📂 간호사 정보 불러오기")
-uploaded_file = st.sidebar.file_uploader("엑셀 파일을 업로드하세요", type=["xlsx"])
+# 📌 근무표 자동 생성 로직
+st.header("📅 간호사 근무표 자동 생성기")
 
-if uploaded_file:
-    df_uploaded = pd.read_excel(uploaded_file)
-    df_uploaded = df_uploaded.fillna("").astype(str)  
+if st.button("📊 근무표 생성"):
+    nurses_df = pd.DataFrame(st.session_state.nurses)
 
-    required_columns = ["직원ID", "이름", "근무 유형", "Charge 가능", "Wanted Off", "휴가", "공가"]
-    
-    if all(col in df_uploaded.columns for col in required_columns):
-        st.session_state.nurses = df_uploaded.to_dict(orient="records")  
-        st.write("📋 현재 저장된 간호사 목록:", st.session_state.nurses)
-        if st.session_state.nurses:
-            assign_priority(st.session_state.nurses)  
-            st.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
-        else:
-            st.warning("📢 업로드된 간호사 데이터가 없습니다.")
-    else:
-        st.error("⚠️ 엑셀 파일의 형식이 올바르지 않습니다.")
+    # 📌 Charge Nurse와 Acting Nurse를 나눠서 처리
+    charge_nurses = nurses_df[nurses_df["Charge 가능"] == "O"]
+    acting_nurses = nurses_df[nurses_df["Acting 가능"] == "O"]
+    night_charge_only = nurses_df[nurses_df["N 차지 전용"] == "O"]
 
-# 📌 연도 및 월 선택 UI 추가
-st.sidebar.subheader("📅 근무표 연도 및 월 선택")
-selected_year = st.sidebar.number_input("연도 선택", min_value=2024, max_value=2030, value=datetime.now().year)
-selected_month = st.sidebar.number_input("월 선택", min_value=1, max_value=12, value=datetime.now().month)
+    # 📌 근무표 기본 구조 설정 (이름 세로축, 날짜 가로축)
+    num_days = 30  # 기본 한 달 30일 설정
+    schedule_df = pd.DataFrame(index=nurses_df["이름"], columns=[f"{i+1}일" for i in range(num_days)])
 
-# 📌 공휴일 자동 조회
-holiday_list = get_korean_holidays(selected_year, selected_month)
-days_in_month = calendar.monthrange(selected_year, selected_month)[1]
-num_weekends = sum(1 for d in range(days_in_month) if calendar.weekday(selected_year, selected_month, d+1) in [5, 6])
-required_offs = num_weekends + len(holiday_list)  # 필수 OFF 수 계산
+    # 📌 Acting Nurse 배치 (각 팀당 1명씩)
+    for day in range(num_days):
+        acting_candidates = acting_nurses.sample(min(len(acting_nurses), 2))  # A팀, B팀 1명씩
+        schedule_df.loc[acting_candidates["이름"], f"{day+1}일"] = "Acting"
 
-# 🔹 **월별 근무표 생성 함수**
-def generate_monthly_schedule(nurses, days=30):
-    n_keep_nurses = [n for n in nurses if n["근무 유형"] == "N Keep"]
-    other_nurses = [n for n in nurses if n["근무 유형"] != "N Keep"]
-    nurses_sorted = sorted(other_nurses, key=lambda x: int(x["직원ID"])) + sorted(n_keep_nurses, key=lambda x: int(x["직원ID"]))
+    # 📌 Charge Nurse 배치 (매 근무 필수 2명)
+    for day in range(num_days):
+        charge_candidates = charge_nurses.sample(min(len(charge_nurses), 2))
+        schedule_df.loc[charge_candidates["이름"], f"{day+1}일"] = "Charge"
 
-    schedule_dict = {f"{n['이름']} ({n['근무 유형']})": [""] * days for n in nurses_sorted}  
-    shift_order = ["D", "E", "N", "OFF"]
-    night_count = {n["이름"]: 0 for n in nurses_sorted}  
+    # 📌 N 근무 배치 (N 차지 전용 필드 활용)
+    for day in range(num_days):
+        night_candidates = night_charge_only.sample(min(len(night_charge_only), 2))
+        schedule_df.loc[night_candidates["이름"], f"{day+1}일"] = "N (C)"
 
-    for day in range(days):
-        is_holiday = (day + 1) in holiday_list  
-        weekday = calendar.weekday(selected_year, selected_month, day + 1)  
-        charge_nurses = [n for n in nurses_sorted if n["Charge 가능"] == "O"]
-
-        for i, nurse in enumerate(nurses_sorted):
-            if night_count[nurse["이름"]] >= 3:
-                assigned_shift = "OFF"
-                night_count[nurse["이름"]] = 0  
-            else:
-                if nurse["근무 유형"] == "D Keep":
-                    assigned_shift = "D"
-                elif nurse["근무 유형"] == "E Keep":
-                    assigned_shift = "E"
-                elif nurse["근무 유형"] == "N Keep":
-                    assigned_shift = "N"
-                    night_count[nurse["이름"]] += 1
-                else:
-                    assigned_shift = shift_order[(i + day) % len(shift_order)]
-
-            if nurse["근무 유형"] == "N 제외" and assigned_shift == "N":
-                assigned_shift = "D"  # ❌ N 제외 선생님들은 N 근무 X
-
-            if is_holiday or weekday in [5, 6]:
-                assigned_shift = shift_order[(i + day) % len(shift_order)]  
-
-            is_charge = False
-            if assigned_shift in ["D", "E", "N"] and nurse in charge_nurses:
-                is_charge = True
-
-            if assigned_shift == "OFF":
-                schedule_dict[f"{nurse['이름']} ({nurse['근무 유형']})"][day] = "OFF"
-            else:
-                schedule_dict[f"{nurse['이름']} ({nurse['근무 유형']})"][day] = f"{assigned_shift} {'(C)' if is_charge else ''}"
-
-    schedule_df = pd.DataFrame(schedule_dict).T
-    schedule_df.columns = [f"{selected_month}월 {d+1}일" for d in range(days)]
-    schedule_df.insert(0, "이름", schedule_df.index)  
-    schedule_df.reset_index(drop=True, inplace=True)  
-
-    return schedule_df
-
-# 📅 근무표 생성 버튼 추가
-st.header(f"📅 {selected_year}년 {selected_month}월 간호사 근무표 자동 생성기")
-if st.button("📌 근무표 생성"):
-    if "nurses" in st.session_state and st.session_state.nurses:
-        schedule_df = generate_monthly_schedule(st.session_state.nurses, days_in_month)
-        st.write(f"📌 **{selected_year}년 {selected_month}월 생성된 근무표 (가독성 개선)**")
-        st.dataframe(schedule_df)
-    else:
-        st.error("❌ 간호사 정보를 먼저 업로드하세요!")
+    # 📌 근무표 표시
+    st.write("### 📋 자동 생성된 근무표")
+    st.dataframe(schedule_df)
