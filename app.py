@@ -81,7 +81,7 @@ if st.button("📊 근무표 생성"):
 
     # 📌 **근무표 수정 가능 UI**
     st.write("### 📝 근무표 수정 (클릭하여 변경 가능)")
-    edited_schedule = st.experimental_data_editor(schedule_df)
+    edited_schedule = st.data_editor(schedule_df)
 
     # 📌 **엑셀 다운로드 기능 추가**
     st.write("📥 **근무표 엑셀 다운로드**")
