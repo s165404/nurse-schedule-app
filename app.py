@@ -2,122 +2,89 @@ import streamlit as st
 import pandas as pd
 import random
 
-# 🚀 간호사 데이터 세션 저장
+# ⚡ Streamlit 설정
+st.set_page_config(page_title="간호사 근무표 자동 생성기", layout="wide")
+
+# ✅ 간호사 정보 저장 (세션 상태)
 if "nurses" not in st.session_state:
     st.session_state.nurses = []
 
-# 📌 **엑셀 파일 업로드**
-st.sidebar.header("📤 간호사 정보 불러오기 (엑셀 업로드)")
-uploaded_file = st.sidebar.file_uploader("📂 엑셀 파일 업로드 (xlsx)", type=["xlsx"])
+# 📌 간호사 추가 함수
+def add_nurse(name, id, work_type, charge, wanted_off, leave, public_holiday):
+    st.session_state.nurses.append({
+        "직원ID": id,
+        "이름": name,
+        "근무 유형": work_type,
+        "Charge 가능": charge,
+        "Wanted Off": wanted_off,
+        "휴가": leave,
+        "공가": public_holiday
+    })
 
-if uploaded_file:
-    df_uploaded = pd.read_excel(uploaded_file)
+# 📌 간호사 정보 입력
+st.sidebar.header("👩‍⚕️ 간호사 추가 및 수정")
+selected_nurse = st.sidebar.selectbox("수정할 간호사 선택", ["새 간호사 추가"] + [n["이름"] for n in st.session_state.nurses])
 
-    # 📌 **필수 컬럼 자동 생성**
-    required_columns = ["이름", "직원ID", "근무 유형", "Charge 가능", "Acting 가능", "N 차지 전용", "Wanted Off", "휴가", "공가"]
-    for col in required_columns:
-        if col not in df_uploaded.columns:
-            df_uploaded[col] = ""
+if selected_nurse == "새 간호사 추가":
+    name = st.sidebar.text_input("이름")
+    id = st.sidebar.text_input("직원ID (숫자 입력)")
+    work_type = st.sidebar.selectbox("근무 유형 선택", ["3교대 가능", "D Keep", "E Keep", "N Keep"])
+    charge = st.sidebar.checkbox("⚡ Charge Nurse 가능")
+    wanted_off = st.sidebar.text_area("Wanted Off (쉼표로 구분)")
+    leave = st.sidebar.text_area("휴가 (쉼표로 구분)")
+    public_holiday = st.sidebar.text_area("공가 (쉼표로 구분)")
+    if st.sidebar.button("✅ 저장"):
+        add_nurse(name, id, work_type, charge, wanted_off, leave, public_holiday)
+        st.sidebar.success(f"{name} 간호사 정보가 저장되었습니다.")
 
-    st.session_state.nurses = df_uploaded.to_dict(orient="records")
-    st.sidebar.success("✅ 간호사 정보가 성공적으로 불러와졌습니다!")
-
-# 📌 **근무시간 정의**
-WORK_HOURS = {
-    "D": (6.5, 15.5),  # 06:30 ~ 15:30
-    "E": (13, 22),     # 13:00 ~ 22:00
-    "N": (21, 8)       # 21:00 ~ 익일 08:00
-}
-
-# 📌 **근무표 생성**
-st.header("📅 간호사 근무표 자동 생성기")
-
+# ✅ 근무표 생성 버튼
+st.title("📅 간호사 근무표 자동 생성기")
 if st.button("📊 근무표 생성"):
+    num_days = 30  # 기본 한 달 (조정 가능)
+    schedule_df = pd.DataFrame(columns=["이름"] + [f"{i+1}일" for i in range(num_days)])
+
+    # 간호사 정보 데이터프레임 변환
     nurses_df = pd.DataFrame(st.session_state.nurses)
 
-    # ✅ **컬럼 자동 생성 (누락 방지)**
-    for col in ["Charge 가능", "Acting 가능", "N 차지 전용", "Wanted Off", "휴가", "공가"]:
-        if col not in nurses_df.columns:
-            nurses_df[col] = ""
+    # 🔥 Night 근무자 우선 배정
+    night_nurses = nurses_df[nurses_df["근무 유형"] == "N Keep"]
+    other_nurses = nurses_df[nurses_df["근무 유형"] != "N Keep"]
+    
+    for nurse in night_nurses.itertuples():
+        for day in range(0, num_days, 3):  # 3일 간격 배정
+            schedule_df.at[nurse.이름, f"{day+1}일"] = "N (C)"
 
-    charge_nurses = nurses_df[nurses_df["Charge 가능"] == "O"]
-    acting_nurses = nurses_df[nurses_df["Acting 가능"] == "O"]
-    night_charge_only = nurses_df[nurses_df["N 차지 전용"] == "O"]
+    # 🔥 나머지 D/E 근무 배정
+    for nurse in other_nurses.itertuples():
+        work_days = random.sample(range(num_days), 10)  # 랜덤 근무 배정
+        for day in work_days:
+            shift = random.choice(["D", "E"])
+            team = random.choice(["A", "B"])  # A팀 / B팀 랜덤 배정
+            if nurse.Charge 가능:
+                schedule_df.at[nurse.이름, f"{day+1}일"] = f"{shift} (C)"
+            else:
+                schedule_df.at[nurse.이름, f"{day+1}일"] = f"{shift} (A)"
 
-    num_days = 30  # 기본 한 달 30일 설정
-    schedule_df = pd.DataFrame(index=nurses_df["이름"], columns=[f"{i+1}일" for i in range(num_days)])
-
-    # 📌 **오프 반영 (Wanted Off → 휴가 → 공가 순)**
-    for nurse in nurses_df.itertuples():
-        off_days = str(getattr(nurse, "Wanted Off", "")).split(",") + \
-                   str(getattr(nurse, "휴가", "")).split(",") + \
-                   str(getattr(nurse, "공가", "")).split(",")
-        for day in off_days:
-            try:
-                day = int(day.strip()) - 1
-                schedule_df.at[nurse.이름, f"{day+1}일"] = "🔴 OFF"
-            except:
-                continue
-
-    # 📌 **최소 오프 개수 자동 보장 (토요일+일요일+공휴일 개수)**
-    required_off = 8  # 예제: 한 달 최소 8개 OFF 필요
-    for nurse in nurses_df.itertuples():
-        off_count = sum([1 for day in range(num_days) if schedule_df.at[nurse.이름, f"{day+1}일"] == "🔴 OFF"])
-        if off_count < required_off:
-            missing_offs = required_off - off_count
-            for _ in range(missing_offs):
-                empty_days = [day for day in range(num_days) if pd.isna(schedule_df.at[nurse.이름, f"{day+1}일"])]
-                if empty_days:
-                    schedule_df.at[nurse.이름, f"{random.choice(empty_days)+1}일"] = "🔴 OFF"
-
-    # 📌 **D, E, N 근무 배정**
-    for day in range(num_days):
-        # D 근무 배정
-        d_candidates = acting_nurses.sample(min(len(acting_nurses), 3))
-        schedule_df.loc[d_candidates["이름"], f"{day+1}일"] = "🟢 D"
-
-        # E 근무 배정
-        e_candidates = acting_nurses.sample(min(len(acting_nurses), 3))
-        schedule_df.loc[e_candidates["이름"], f"{day+1}일"] = "🟢 E"
-
-        # N 근무 배정
-        n_candidates = night_charge_only.sample(min(len(night_charge_only), 2))
-        schedule_df.loc[n_candidates["이름"], f"{day+1}일"] = "🔵 N (C)"
-
-    # 📌 **Charge Nurse 배정 (매 근무 필수 2명)**
-    for day in range(num_days):
-        charge_candidates = charge_nurses.sample(min(len(charge_nurses), 2))
-        schedule_df.loc[charge_candidates["이름"], f"{day+1}일"] = "🔵 Charge"
-
-    # 📌 **연속 근무 제한 (최대 3일, 인원 부족 시 5일까지 허용)**
+    # ⚠ 연속 근무 초과 표시
     for nurse in nurses_df.itertuples():
         consecutive_days = 0
         for day in range(num_days):
-            current_shift = schedule_df.at[nurse.이름, f"{day+1}일"]
-            if current_shift not in ["🔴 OFF", None]:
+            if pd.notna(schedule_df.at[nurse.이름, f"{day+1}일"]) and schedule_df.at[nurse.이름, f"{day+1}일"] != "🔴 OFF":
                 consecutive_days += 1
                 if consecutive_days > 3:
                     schedule_df.at[nurse.이름, f"{day+1}일"] += " ⚠"  # 3일 초과 시 경고 표시
+                if consecutive_days > 5:
+                    schedule_df.at[nurse.이름, f"{day+1}일"] += " ⚠⚠"  # 5일 초과 시 강한 경고
             else:
                 consecutive_days = 0
 
-    # 📌 **미오프 수당 표시 (필수 오프 못 채운 경우)**
-    for nurse in nurses_df.itertuples():
-        off_count = sum([1 for day in range(num_days) if schedule_df.at[nurse.이름, f"{day+1}일"] == "🔴 OFF"])
-        if off_count < required_off:
-            missing_offs = required_off - off_count
-            schedule_df.at[nurse.이름, "미오프"] = f"⚠ 미오프 {missing_offs}일"
+    # 📌 가독성 개선을 위한 컬러 표시
+    st.write("✏ **근무표 수정 (클릭하여 변경 가능)**")
+    edited_schedule = st.experimental_data_editor(schedule_df)
 
-    # 📌 **근무표 수정 가능 UI**
-    st.write("### 📝 근무표 수정 (클릭하여 변경 가능)")
-    edited_schedule = st.data_editor(schedule_df)
+    # 📥 **엑셀 다운로드 기능**
+    st.download_button("📥 근무표 엑셀 다운로드", edited_schedule.to_csv(index=False).encode("utf-8"), "nurse_schedule.csv")
 
-    # 📌 **엑셀 다운로드 기능 추가**
-    st.write("📥 **근무표 엑셀 다운로드**")
-    output_file = "nurse_schedule.xlsx"
-    edited_schedule.to_excel(output_file)
-    st.download_button(label="📥 근무표 다운로드", data=open(output_file, "rb"), file_name="근무표.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    # 📌 **최종 근무표 표시**
-    st.write("### 📋 자동 생성된 근무표")
-    st.dataframe(edited_schedule)
+# 📌 자동 생성된 근무표 출력
+st.subheader("📜 자동 생성된 근무표")
+st.dataframe(schedule_df)
