@@ -15,8 +15,8 @@ def add_nurse(name, id, work_type, charge, wanted_off, leave, public_holiday):
         "직원ID": id,
         "이름": name,
         "근무 유형": work_type,
-        "Charge 가능": charge,
-        "Wanted Off": wanted_off,
+        "Charge_가능": charge,
+        "Wanted_Off": wanted_off,
         "휴가": leave,
         "공가": public_holiday
     })
@@ -60,7 +60,7 @@ if st.button("📊 근무표 생성"):
         for day in work_days:
             shift = random.choice(["D", "E"])
             team = random.choice(["A", "B"])  # A팀 / B팀 랜덤 배정
-            if nurse.Charge 가능:
+            if nurse.Charge_가능:  # ← 여기가 수정된 부분!
                 schedule_df.at[nurse.이름, f"{day+1}일"] = f"{shift} (C)"
             else:
                 schedule_df.at[nurse.이름, f"{day+1}일"] = f"{shift} (A)"
