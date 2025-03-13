@@ -98,7 +98,7 @@ if st.button("📊 근무표 생성"):
 
         # 📌 가독성 개선을 위한 컬러 표시
         st.write("✏ **근무표 수정 (클릭하여 변경 가능)**")
-        edited_schedule = st.experimental_data_editor(schedule_df)
+        edited_schedule = st.data_editor(schedule_df)
 
         # 📥 **엑셀 다운로드 기능**
         st.download_button("📥 근무표 엑셀 다운로드", edited_schedule.to_csv(index=False).encode("utf-8"), "nurse_schedule.csv")
