@@ -108,7 +108,14 @@ st.subheader("📜 자동 생성된 근무표")
 
 # 🔥 근무표 데이터 확인용
 st.write("📌 현재 schedule_df 데이터확인:") 
-st.write(schedule_df)
+
+# ✅ schedule_df 변수가 존재할 때만 실행!
+if 'schedule_df' in locals() and schedule_df is not None:  
+    st.write("📌 현재 schedule_df 데이터 확인:")
+    st.write(schedule_df)
+else:
+    st.write("❌ Error: schedule_df가 아직 생성되지 않았습니다!")
 
 # 🔥 근무표 화면에 표시 
-st.dataframe(schedule_df)
+if 'schedule_df' in locals() and schedule_df is not None:
+    st.dataframe(schedule_df)
