@@ -61,9 +61,9 @@ if st.button("📅 근무표 생성"):
         off_days = {}
 
         for nurse in df_nurses.itertuples():
-            wanted_off = str(nurse.Wanted_Off).split(",") if pd.notna(nurse.Wanted_Off) else []
-            vacation = str(nurse.휴가).split(",") if pd.notna(nurse.휴가) else []
-            official_off = str(nurse.공가).split(",") if pd.notna(nurse.공가) else []
+            wanted_off = str(getattr(nurse, "Wanted_Off", "")).split(",") if pd.notna(getattr(nurse, "Wanted_Off", "")) else []
+            vacation = str(getattr(nurse, "휴가", "")).split(",") if pd.notna(getattr(nurse, "휴가", "")) else []
+            official_off = str(getattr(nurse, "공가", "")).split(",") if pd.notna(getattr(nurse, "공가", "")) else []
             off_days[nurse.이름] = set(wanted_off + vacation + official_off)
 
         schedule_df = pd.DataFrame(index=df_nurses["이름"], columns=[f"{i+1}일" for i in range(days_in_month)])
