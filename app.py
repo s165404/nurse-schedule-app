@@ -77,7 +77,7 @@ if st.button("📅 근무표 생성"):
                     schedule_df.at[nurse.이름, f"{day+1}일"] = "OFF"
                     continue
 
-                if n_count < 2 and nurse.근무유형 in ["N Keep", "3교대 가능"]:
+                if n_count < 2 and getattr(nurse, "근무유형", "") in ["N Keep", "3교대 가능"]:
                     shift = "N"
                     n_count += 1
                     if nurse.Charge_가능 == "O":
