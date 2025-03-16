@@ -51,8 +51,8 @@ if uploaded_file:
         # 휴무자 제외
         available_nurses = nurses_df[~nurses_df["Wanted Off"].apply(lambda x: str(day) in x)]
 
-        # 근무 배정 함수
-       def assign_shift(schedule_df, nurses_df, day):
+    # 근무 배정 함수
+    def assign_shift(schedule_df, nurses_df, day):
     """
     하루치 근무를 배정하는 함수
     - 필수 인원 (D: 차지2+액팅2 / E: 차지2+액팅2 / N: 2명)
